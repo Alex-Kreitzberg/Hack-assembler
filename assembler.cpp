@@ -144,11 +144,15 @@ vector<string> to_vector(istream& input_stream, char delim = '\n'){
 
 void assembler(istream& input_stream, ostream& output_stream){
   vector<string> program = to_vector(input_stream);
+
   for(const string& current_line : program){
     string address;
     computation command;
     if(to_binary_address(current_line, address)){
       output_stream << "0" << address << '\n';
+      //TODO: consider:
+      //string binary_address{"0" + address + '\n'};
+      //assembled.push_back{binary_address};
     }
     else if(to_computation(current_line, command)){
       output_stream << "111" 
@@ -156,14 +160,18 @@ void assembler(istream& input_stream, ostream& output_stream){
 		    << dest(command) 
 		    << jump(command) 
                     << '\n';
+      //TODO: consider:
+      //string binary_computation{ "111" + comp(command) +... + '\n'}
+      //assembled.push_back{binary_computation}
     }
     else if(is_comment(current_line)){
       //Don't do anything
     }
     else{
-      failed_parse{}; 
+      throw failed_parse{}; 
     }
   }
+  //TODO:Think about moving output logic to here.
 }
 
 }
