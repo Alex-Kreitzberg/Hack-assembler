@@ -102,8 +102,8 @@ regex comment_pattern{comment_notation};
 //TODO: perhaps this isn't cohesive, presumably this is just a tokenizer.
 //however it also translates address into binary.
 bool to_binary_address(
-const string& possible_address, 
-string& binary_address){
+  const string& possible_address, 
+  string& binary_address){
 
   smatch matches;
   bool is_address 
@@ -138,13 +138,20 @@ bool is_comment(const string& possible_comment){
 
 struct failed_parse{};
 
-vector<string> to_vector(istream& input_stream, char delim = '\n'){
-  vector<string> vectored_input_stream;
-
-  string current_line;
-  while( getline(input_stream, current_line, delim) )
-    vectored_input_stream.push_back(current_line);
-
+vector<string> to_vector(istream& input_stream, string delim = "\n"){
+  string entire_stream{ 
+    istreambuf_iterator<char>{input_stream},
+    istreambuf_iterator<char>{}
+  };
+  vector<string> vectored_input_stream{
+    sregex_token_iterator{
+      begin(entire_stream),
+      end(entire_stream),
+      regex{delim},
+      -1
+    },
+    sregex_token_iterator{}
+  };
   return vectored_input_stream; //NOTE: c++11 feature.
 }
 
