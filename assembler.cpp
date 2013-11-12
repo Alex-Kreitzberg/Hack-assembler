@@ -5,6 +5,7 @@
 #include<boost/regex.hpp>
 #include<stdexcept>
 #include<fstream>
+#include<algorithm>
 
 #include"appLib/cast.h"
 //g++ assembler.cpp -o assembler -lboost_regex
@@ -158,24 +159,23 @@ vector<string> to_vector(istream& input_stream, string delim = "\n"){
 void assembler(istream& input_stream, ostream& output_stream){
   vector<string> program = to_vector(input_stream);
   //TODO: First pass through. replace variables with unique addresses
+  vector<string> assembly{};
   for(const string& current_line : program){
     string address;
     computation command;
     if(to_binary_address(current_line, address)){
-      output_stream << "0" << address << '\n';
-      //TODO: consider:
-      //string binary_address{"0" + address + '\n'};
-      //assembled.push_back{binary_address};
+      assembly.emplace_back(
+        "0" + 
+        address
+      );
     }
     else if(to_computation(current_line, command)){
-      output_stream << "111" 
-	            << comp(command)
-		    << dest(command) 
-		    << jump(command) 
-                    << '\n';
-      //TODO: consider:
-      //string binary_computation{ "111" + comp(command) +... + '\n'}
-      //assembled.push_back{binary_computation}
+      assembly.emplace_back(
+        "111" + 
+	comp(command) +
+	dest(command) +
+	jump(command)
+      );
     }
     else if(is_comment(current_line)){
       //Don't do anything
@@ -184,7 +184,15 @@ void assembler(istream& input_stream, ostream& output_stream){
       throw failed_parse{}; 
     }
   }
-  //TODO:Think about moving output logic to here.
+  ostream_iterator<string> assembly_output{
+    output_stream,
+    "\n"
+  };
+  copy(
+    begin(assembly),
+    end(assembly),
+    assembly_output
+  );
 }
 
 }
