@@ -1,5 +1,6 @@
 #include<iostream>
 #include<unordered_map>
+#include<map>
 #include<string>
 #include<bitset>
 #include<boost/regex.hpp>
@@ -7,9 +8,10 @@
 #include<fstream>
 #include<algorithm>
 
+#include "appLib/profile.h"
 #include "appLib/algorithm.h"
 #include "appLib/cast.h"
-//g++ assembler.cpp -o assembler -lboost_regex
+//g++ assembler.cpp -o assembler -lboost_regex -O2
 using namespace std;
 using namespace boost;
 namespace{
@@ -110,35 +112,11 @@ string jump(computation to_read_jump){
   return jump_try;
 }
 
-unordered_map< string, string  > symbol_table{
-  { "SP", "0" },
-  { "LCL", "1" },
-  { "ARG", "2" },
-  { "THIS", "3" },
-  { "THAT", "4" },
-  { "R0", "0" },
-  { "R1", "1" },
-  { "R2", "2" },
-  { "R3", "3" },
-  { "R4", "4" },
-  { "R5", "5" },
-  { "R6", "6" },
-  { "R7", "7" },
-  { "R8", "8" },
-  { "R9", "9" },
-  { "R10", "10" },
-  { "R11", "11" },
-  { "R12", "12" },
-  { "R13", "13" },
-  { "R14", "14" },
-  { "R15", "15" },
-  { "SCREEN", "16384" },
-  { "KBD", "24576" }
-};
-const unsigned int FIRST_FREE_MEMORY_ADDRESS = 16;
 
+
+//TODO:There seems to be performance issues with the regular expression engine
+//If I ever care to improve the performance of the compiler look to that
 const string comment_notation = R"(\s*((//).*)?)";
-
 //TODO: perhaps this isn't cohesive, presumably this is just a tokenizer.
 //however it also translates address into binary.
 bool to_binary_address(
@@ -164,9 +142,9 @@ bool to_computation(
 
   regex computation_pattern{
     "\\s*"  //arbitrary spaces in front.
-    "(?:([AMD]+)=)?"  //AMD= may be omitted
-    "([-+01!&|A-Z]+)"
-    "(?:;([A-Z]+))?"  //;JMP may be omitted
+    "(?:([AMD]{1,3})=)?"  //AMD= may be omitted
+    "([-+01!&|AMD]{1,3})"
+    "(?:;([A-Z]{3}))?"  //;JMP may be omitted
     + comment_notation
   };
 
@@ -187,7 +165,7 @@ bool is_comment(const string& possible_comment){
   return regex_match(possible_comment, comment_pattern);
 }
 
-const string name_notation{"[^0-9][$A-Z:a-z.0-9_]*"};
+const string name_notation{"[$A-Z:a-z._][$A-Z:a-z.0-9_]*"};
 bool to_label(const string& possible_label, string& label){
   //Error: "not digit" block breaks other requirements
   //regex specifies patterns like (LOOP) where the token value is LOOP.
@@ -207,7 +185,7 @@ bool is_label(const string& possible_label){
   string dummy{};
   return to_label(possible_label, dummy);
 }
-//TODO: THIS MUST ACCEPT TABS
+
 bool to_variable(const string& possible_variable, string& variable){
   regex variable_pattern{"\\s*@("+name_notation+")"+comment_notation};
   smatch matches;
@@ -222,21 +200,14 @@ bool is_variable(const string& possible_variable){
   string dummy{};
   return to_variable(possible_variable, dummy);
 }
-vector<string> to_vector(istream& input_stream, string delim = "\n"){
-  string entire_stream{ 
-    istreambuf_iterator<char>{input_stream},
-    istreambuf_iterator<char>{}
-  };
-  vector<string> vectored_input_stream{
-    sregex_token_iterator{
-      begin(entire_stream),
-      end(entire_stream),
-      regex{delim},
-      -1
-    },
-    sregex_token_iterator{}
-  };
-  return vectored_input_stream; //NOTE: c++11 feature.
+
+
+vector<string> to_vector(istream& input_stream, char delim = '\n'){
+  vector<string> to_output;
+  string line;
+  while(getline(input_stream, line, delim))
+    to_output.push_back(line);
+  return to_output; //NOTE: c++11 feature.
 }
 
 void display(const vector<string>& to_display){
@@ -248,26 +219,52 @@ void display(const unordered_map<string,string>& to_display){
     cout << "{" << p.first << "," << p.second << "}\n";
 }
 
+unordered_map< string, string  > 
+symbol_table{
+  { "SP", "0" },
+  { "LCL", "1" },
+  { "ARG", "2" },
+  { "THIS", "3" },
+  { "THAT", "4" },
+  { "R0", "0" },
+  { "R1", "1" },
+  { "R2", "2" },
+  { "R3", "3" },
+  { "R4", "4" },
+  { "R5", "5" },
+  { "R6", "6" },
+  { "R7", "7" },
+  { "R8", "8" },
+  { "R9", "9" },
+  { "R10", "10" },
+  { "R11", "11" },
+  { "R12", "12" },
+  { "R13", "13" },
+  { "R14", "14" },
+  { "R15", "15" },
+  { "SCREEN", "16384" },
+  { "KBD", "24576" }
+};
+const int FIRST_FREE_MEMORY_ADDRESS = 16;
+
 struct multiple_labels_with_same_name{};
 void replace_symbols(vector<string>& program){
   //TODO: separate remove and erase idiom into header file.
-  //strip comments and empty lines
 
+  //strip comments and empty lines
   appLib::remove_if(program,
     is_comment
   );
 
   //build symbol table for labels.
-  unsigned int line_number = 0;
+  int line_number = 0;
   for(auto& line : program){
     string label;
     if(to_label(line, label)){
       symbol_table[label] = appLib::to<string>(line_number);
       --line_number;
     }
-    //multiple labels with the same name aren't errors.
-    //TODO: maybe they should be...
-
+    //multiple same names aren't errors. TODO: maybe they should be...
      ++line_number;                           
   }
 
@@ -279,7 +276,7 @@ void replace_symbols(vector<string>& program){
   //associate variables with memory addresses.
   //if variable is already defined assign it to the line
   //TODO: cohesion problem?
-  unsigned int memory_address = FIRST_FREE_MEMORY_ADDRESS; 
+  int memory_address = FIRST_FREE_MEMORY_ADDRESS; 
   for(string& line : program){
     string variable;
     if(to_variable(line, variable)){
@@ -295,58 +292,50 @@ struct failed_parse{};
 
 void assembler(istream& input_stream, ostream& output_stream){
   vector<string> program = to_vector(input_stream);
-
+  
   //TODO: First pass through. replace variables with unique addresses
   replace_symbols(program);  
 
-  vector<string> assembly{};
-  for(const string& current_line : program){
+  //replace @number with binary form.
+  for(string& line : program){
     string address;
-    computation command;
-    if(to_binary_address(current_line, address)){
-      //TODO: think about how to encapsulate "Magic literals" like 0
-      assembly.emplace_back(
-        "0" + 
-        address
-      );
-    }
-    else if(to_computation(current_line, command)){
-      assembly.emplace_back(
-        "111" + 
-	comp(command) +
-	dest(command) +
-	jump(command)
-      );
-    }
-    else if(is_comment(current_line)){
-      //Don't do anything
-    }
-    else{
-      cout << "the failed line is: " << current_line << '\n';
-      display(symbol_table);
-      cout << '\n';
-      throw failed_parse{}; 
+    if(to_binary_address(line, address)){
+      line = "0" + address;  //TODO: encapsulate "Magic literals" 0
     }
   }
-  ostream_iterator<string> assembly_output{
-    output_stream,
-    "\n"
-  };
+
+  //replace dest;comp;jmp with binary form.
+  for(string& line : program){
+    computation command;
+    if(to_computation(line, command)){
+      line =
+	"111" + 
+	comp(command) +
+	dest(command) +
+	jump(command);
+    }
+  }
+
+  //TODO: "compile error" logic can go here
+
   copy(
-    begin(assembly),
-    end(assembly),
-    assembly_output
+    begin(program),
+    end(program),
+    ostream_iterator<string>{
+      output_stream,
+      "\n"
+    }
   );
 }
 
 }
 
 int main(){
-  string from, to;
-  cin >> from >> to;
-  ifstream is{from};
-  ofstream os{to};
+  cout << "Please enter the file name: \n";
+  string file_name;
+  cin >> file_name;
+  
+  ifstream is{file_name +".asm"};
+  ofstream os{file_name +".hack"};
   assembler(is, os);
 }
-
-//Max.asm Max.hack
