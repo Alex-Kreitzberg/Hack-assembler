@@ -210,15 +210,6 @@ vector<string> to_vector(istream& input_stream, char delim = '\n'){
   return to_output; //NOTE: c++11 feature.
 }
 
-void display(const vector<string>& to_display){
-  for(auto& line : to_display)
-    cout << line << '\n';
-}
-void display(const unordered_map<string,string>& to_display){
-  for(auto& p : to_display)
-    cout << "{" << p.first << "," << p.second << "}\n";
-}
-
 unordered_map< string, string  > 
 symbol_table{
   { "SP", "0" },
